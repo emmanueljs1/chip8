@@ -134,14 +134,14 @@ let run_with ~debug:(_: bool) ~freq:(hz: int) ~prog:(m: char array) : unit =
 
             if time_elapsed_in_cycle' >= cycle_time then
               let extra_cycles_time = time_elapsed_in_cycle' -. cycle_time in
-              let extra_cycles_ran =
+              let extra_cycles =
                 extra_cycles_time /. cycle_time |> int_of_float
               in
               let time_elapsed_in_next_cycle =
-                extra_cycles_time -. (float_of_int extra_cycles_ran *. cycle_time)
+                extra_cycles_time -. (float_of_int extra_cycles *. cycle_time)
               in
 
-              loop (n - 1 - extra_cycles_ran) time_elapsed_in_next_cycle
+              loop (n - 1 - extra_cycles) time_elapsed_in_next_cycle
             else
               loop n time_elapsed_in_cycle'
           end
