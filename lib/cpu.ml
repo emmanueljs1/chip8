@@ -81,82 +81,122 @@ let run_with ~debug:(_: bool) ~freq:(hz: int) ~prog:(m: char array) : unit =
   let booted_at = Unix.gettimeofday () in
   let cpu_mutex = Mutex.create () in
 
-  let timer_update_thread =
+  let timer_thread =
     Thread.create (fun init ->
-      let rec timer_update_loop (last_timer_update: float) : unit =
-        let updated_at = Unix.gettimeofday () in
-
-        Mutex.lock cpu_mutex;
-        if !cpu.off then Thread.exit ();
-        Mutex.unlock cpu_mutex;
-
-        let timer_updates =
-          (updated_at -. last_timer_update) /. timer_update_time
-        in
-        for _ = 1 to ceil timer_updates |> int_of_float do
-          Mutex.lock cpu_mutex;
-          if needs_timer_update !cpu then cpu := decr_timers !cpu;
-          Mutex.unlock cpu_mutex;
-        done;
-
+      let rec timer_loop (last_timer_tick: float) : unit =
         let now = Unix.gettimeofday () in
-        let elapsed = now -. updated_at in
-        if elapsed < timer_update_time then
-          timer_update_time -. elapsed |> Thread.delay;
 
-        timer_update_loop updated_at
+        (* TODO: exit thread if CPU is off *)
+
+        let elapsed_since_last_tick = now -. last_timer_tick in
+
+         if elapsed_since_last_tick < timer_update_time then (
+           timer_update_time -. elapsed_since_last_tick |> Thread.delay;
+           timer_loop last_timer_tick
+         ) else
+          let timer_updates =
+            elapsed_since_last_tick /. timer_update_time |> int_of_float
+          in
+
+          for _ = 1 to timer_updates do
+            Mutex.lock cpu_mutex;
+            if needs_timer_update !cpu then cpu := decr_timers !cpu;
+            Mutex.unlock cpu_mutex;
+          done;
+
+          let elapsed_in_updates =
+            float_of_int timer_updates *. elapsed_since_last_tick
+          in
+          let elapsed_actual = (Unix.gettimeofday ()) -. last_timer_tick in
+          let timer_elapsed =
+            if elapsed_actual <= elapsed_in_updates then
+              elapsed_in_updates
+            else
+              let actual_updates =
+                elapsed_actual /. timer_update_time |> int_of_float
+              in
+              let missing_updates = actual_updates - timer_updates in
+              for _ = 1 to missing_updates do
+                Mutex.lock cpu_mutex;
+                if needs_timer_update !cpu then cpu := decr_timers !cpu;
+                Mutex.unlock cpu_mutex;
+              done;
+              float_of_int actual_updates *. elapsed_actual
+          in
+          elapsed_actual -. timer_elapsed |> Thread.delay;
+          timer_loop (last_timer_tick +. timer_elapsed)
       in
-      timer_update_loop init
+      timer_loop init
     ) booted_at
   in
 
-  let cycle_thread =
+  let clock_thread =
     Thread.create (fun init ->
       let rec clock_loop (last_clock_tick: float) : unit =
-        let tick = Unix.gettimeofday () in
+        let now = Unix.gettimeofday () in
 
         (* TODO: turn off cpu and exit thread based on user input *)
 
-        let cycles_to_run =
-          (tick -. last_clock_tick) /. cycle_time |> int_of_float
-        in
-        let rec loop (n: int) (time_elapsed_in_cycle: float) : unit =
-          begin match n with
-          | 0 -> ()
-          | _ ->
-            Mutex.lock cpu_mutex;
-            let (cpu', duration_ms) = step !cpu in
-            cpu := cpu';
-            Mutex.unlock cpu_mutex;
-            let time_elapsed_in_cycle' =
-              time_elapsed_in_cycle +. (duration_ms /. 1_000_000.)
-            in
+        let elapsed_since_last_tick = now -. last_clock_tick in
 
-            if time_elapsed_in_cycle' >= cycle_time then
-              let extra_cycles_time = time_elapsed_in_cycle' -. cycle_time in
-              let extra_cycles =
-                extra_cycles_time /. cycle_time |> int_of_float
-              in
-              let time_elapsed_in_next_cycle =
-                extra_cycles_time -. (float_of_int extra_cycles *. cycle_time)
+        if elapsed_since_last_tick < cycle_time then (
+          cycle_time -. elapsed_since_last_tick |> Thread.delay;
+          clock_loop last_clock_tick
+        ) else
+          let cycles_to_run =
+            elapsed_since_last_tick /. cycle_time |> int_of_float
+          in
+
+          let rec loop (n: int) (time_elapsed_in_cycle: float) : unit =
+            if n > 0 then (
+              Mutex.lock cpu_mutex;
+              let (cpu', duration_ms) = step !cpu in
+
+              let time_elapsed_in_cycle' =
+                time_elapsed_in_cycle +. (duration_ms /. 1_000_000.)
               in
 
-              loop (n - 1 - extra_cycles) time_elapsed_in_next_cycle
+              if time_elapsed_in_cycle' >= cycle_time then (
+                let extra_cycles_time = time_elapsed_in_cycle' -. cycle_time in
+                let extra_cycles =
+                  extra_cycles_time /. cycle_time |> int_of_float
+                in
+                let time_elapsed_in_next_cycle =
+                  extra_cycles_time -. (float_of_int extra_cycles *. cycle_time)
+                in
+
+                if extra_cycles <= n - 1 then (
+                  cpu := cpu';
+                );
+                Mutex.unlock cpu_mutex;
+
+                loop (n - 1 - extra_cycles) time_elapsed_in_next_cycle
+              ) else
+                cpu := cpu';
+                Mutex.unlock cpu_mutex;
+
+                loop n time_elapsed_in_cycle'
+            );
+          in
+          loop cycles_to_run 0.;
+
+          let elapsed_in_cycles = float_of_int cycles_to_run *. cycle_time in
+          let elapsed_actual = (Unix.gettimeofday ()) -. last_clock_tick in
+          let clock_elapsed =
+            if elapsed_actual <= elapsed_in_cycles then
+              elapsed_in_cycles
             else
-              loop n time_elapsed_in_cycle'
-          end
-        in
-        loop cycles_to_run 0.;
-
-        let now = Unix.gettimeofday () in
-        let elapsed = now -. tick in
-        if elapsed < cycle_time then cycle_time -. elapsed |> Thread.delay;
-
-        clock_loop tick
+              let actual_cycles_ran =
+                elapsed_actual /. cycle_time |> ceil |> int_of_float
+              in
+              float_of_int actual_cycles_ran *. cycle_time
+          in
+          elapsed_actual -. clock_elapsed |> Thread.delay;
+          clock_loop (last_clock_tick +. clock_elapsed)
       in
       clock_loop init
     ) booted_at
   in
 
-  Thread.join cycle_thread;
-  Thread.join timer_update_thread
+  Thread.join clock_thread;
+  Thread.join timer_thread
