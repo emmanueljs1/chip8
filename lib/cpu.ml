@@ -20,8 +20,9 @@ type registers =
 type instruction =
   | ClearScreen
 
-let decode_instruction (_: char) : instruction * int =
-  failwith "uninplemented"
+let decode_instruction (_: char) : instruction * float =
+  (* TODO: implement *)
+  (ClearScreen,  1000.)
 
 type cpu =
   { mem: char array
@@ -42,12 +43,14 @@ let decr_timers (cpu: cpu) : cpu =
   let delay_timer' = int_of_char cpu.delay_timer - 1 |> max 0 |> char_of_int in
   { cpu with sound_timer = sound_timer' ; delay_timer = delay_timer' }
 
-let execute_instruction (_: cpu) (_: instruction) : cpu =
-  failwith "unimplemented"
+let execute_instruction (cpu: cpu) (_: instruction) : cpu =
+  (* TODO: implement *)
+  { cpu with pc = cpu.pc + 1 }
 
 let boot ~program:(m: char array): cpu =
   let load_font (_: char array) : unit =
-    failwith "unimplemented"
+    (* TODO: implement *)
+    ()
   in
 
   let mem = char_of_int 0 |> Array.make 4096 in
@@ -64,7 +67,7 @@ let boot ~program:(m: char array): cpu =
   ; off = false
   }
 
-let step (cpu: cpu) : cpu * int =
+let step (cpu: cpu) : cpu * float =
   let encoded_instruction = cpu.mem.(cpu.pc) in
   let instruction, duration = decode_instruction encoded_instruction in
   let cpu' = execute_instruction cpu instruction in
@@ -126,15 +129,21 @@ let run_with ~debug:(_: bool) ~freq:(hz: int) ~prog:(m: char array) : unit =
             cpu := cpu';
             Mutex.unlock cpu_mutex;
             let time_elapsed_in_cycle' =
-              time_elapsed_in_cycle +. (duration_ms / 1000 |> float_of_int)
+              time_elapsed_in_cycle +. (duration_ms /. 1_000_000.)
             in
-            let cycles_ran =
-              time_elapsed_in_cycle' /. cycle_time |> int_of_float
-            in
-            let time_elapsed_in_cycle'' =
-              if cycles_ran > 0 then time_elapsed_in_cycle' else 0.
-            in
-            loop (n - cycles_ran) time_elapsed_in_cycle''
+
+            if time_elapsed_in_cycle' >= cycle_time then
+              let extra_cycles_time = time_elapsed_in_cycle' -. cycle_time in
+              let extra_cycles_ran =
+                extra_cycles_time /. cycle_time |> int_of_float
+              in
+              let time_elapsed_in_next_cycle =
+                extra_cycles_time -. (float_of_int extra_cycles_ran *. cycle_time)
+              in
+
+              loop (n - 1 - extra_cycles_ran) time_elapsed_in_next_cycle
+            else
+              loop n time_elapsed_in_cycle'
           end
         in
         loop cycles_to_run 0.;
