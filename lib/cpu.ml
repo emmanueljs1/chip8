@@ -105,27 +105,9 @@ let run_with ~debug:(_: bool) ~freq:(hz: int) ~prog:(m: char array) : unit =
           done;
 
           let elapsed_in_updates_calc =
-            float_of_int timer_updates *. elapsed_since_last_tick
+            float_of_int timer_updates *. timer_update_time
           in
-          let elapsed_sys = (Unix.gettimeofday ()) -. last_timer_tick in
-          let elapsed_in_loop_calc =
-            if elapsed_sys <= elapsed_in_updates_calc then
-              elapsed_in_updates_calc
-            else
-              let updates_equiv =
-                elapsed_sys /. timer_update_time |> int_of_float
-              in
-              let missing_updates = updates_equiv - timer_updates in
-              for _ = 1 to missing_updates do
-                Mutex.lock cpu_mutex;
-                if needs_timer_update !cpu then cpu := decr_timers !cpu;
-                Mutex.unlock cpu_mutex;
-              done;
-              float_of_int updates_equiv *. timer_update_time
-          in
-          if elapsed_sys > elapsed_in_loop_calc then
-            elapsed_sys -. elapsed_in_loop_calc |> Thread.delay;
-          timer_loop (last_timer_tick +. elapsed_in_loop_calc)
+          timer_loop (last_timer_tick +. elapsed_in_updates_calc)
       in
       timer_loop init
     ) booted_at
@@ -141,7 +123,9 @@ let run_with ~debug:(_: bool) ~freq:(hz: int) ~prog:(m: char array) : unit =
         let elapsed_since_last_tick = now -. last_clock_tick in
 
         if elapsed_since_last_tick < cycle_time then (
-          1. -. elapsed_since_last_tick |> Thread.delay;
+          let cycles_to_sleep = float_of_int hz /. 50. |> max 10. in
+          (cycle_time *. cycles_to_sleep) -. elapsed_since_last_tick
+          |> Thread.delay;
           clock_loop last_clock_tick
         ) else
           let cycles_to_run =
