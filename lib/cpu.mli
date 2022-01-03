@@ -1,4 +1,4 @@
-module Make (G: Gui.G) : sig
+module Make (GUI: Gui.GUI) : sig
   type cpu
 
   val boot : program:char array -> cpu

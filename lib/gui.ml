@@ -1,1 +1,1 @@
-module type G = sig end
+module type GUI = sig end

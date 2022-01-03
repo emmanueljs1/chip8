@@ -25,13 +25,13 @@ type state =
   | Paused
   | Off
 
-module Make (G: Gui.G) = struct
-  module Gpu = Gpu.Make(G)
+module Make (GUI: Gui.GUI) = struct
+  module Gpu = Gpu.Make(GUI)
 
   type cpu =
     { mem: char array
     ; stack: int list
-    ; display: bool array
+    ; gpu: Gpu.gpu
     ; sound_timer: char
     ; delay_timer: char
     ; index: int
@@ -50,7 +50,7 @@ module Make (G: Gui.G) = struct
     let delay_timer' = int_of_char cpu.delay_timer - 1 |> max 0 |> char_of_int in
     { cpu with sound_timer = sound_timer' ; delay_timer = delay_timer' }
 
-  let boot ~program:(m: char array) : cpu =
+  let boot ~program =
     let load_font (_: char array) : unit =
       (* TODO: implement *)
       ()
@@ -58,11 +58,11 @@ module Make (G: Gui.G) = struct
 
     let mem = char_of_int 0 |> Array.make 4096 in
     load_font mem;
-    Array.blit m 0 mem 0x0200 (Array.length m);
+    Array.blit program 0 mem 0x0200 (Array.length program);
 
     { mem = mem
     ; stack = []
-    ; display = Array.make 2048 false
+    ; gpu = Gpu.init ()
     ; sound_timer = char_of_int 0
     ; delay_timer = char_of_int 0
     ; index = 0
@@ -76,8 +76,8 @@ module Make (G: Gui.G) = struct
     let cpu' = execute_instruction cpu instruction in
     cpu', instruction.duration_ms
 
-  let run ~debug:(_: bool) ~frequency:(hz: int) (cpu: cpu) : unit =
-    let cycle_time = 1. /. (float_of_int hz) in
+  let run ~debug ~frequency cpu =
+    let cycle_time = 1. /. (float_of_int frequency) in
     let timer_update_time = 1. /. 60. in
 
     let cpu = ref cpu in
@@ -135,7 +135,7 @@ module Make (G: Gui.G) = struct
           match !cpu.state with
           | Running ->
             if elapsed_since_last_tick < cycle_time then (
-              let cycles_to_sleep = float_of_int hz /. 50. |> max 10. in
+              let cycles_to_sleep = float_of_int frequency /. 50. |> max 10. in
               (cycle_time *. cycles_to_sleep) -. elapsed_since_last_tick
               |> Thread.delay;
               clock_loop last_clock_tick
