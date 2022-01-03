@@ -15,4 +15,7 @@ let () =
         end
   in
   let program = char_of_int 0x00E0 |> Array.make 100 in
-  Cpu.run_with ~debug:debug ~freq:frequency ~prog:program
+  let module Gui = struct end in
+  let module Cpu = Cpu.Make(Gui) in
+  let cpu = Cpu.boot ~program:program in
+  Cpu.run ~debug:debug ~frequency:frequency cpu
