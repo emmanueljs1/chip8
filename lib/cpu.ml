@@ -141,7 +141,7 @@ let run_with ~debug:(_: bool) ~freq:(hz: int) ~prog:(m: char array) : unit =
         let elapsed_since_last_tick = now -. last_clock_tick in
 
         if elapsed_since_last_tick < cycle_time then (
-          cycle_time -. elapsed_since_last_tick |> Thread.delay;
+          1. -. elapsed_since_last_tick |> Thread.delay;
           clock_loop last_clock_tick
         ) else
           let cycles_to_run =
@@ -183,25 +183,10 @@ let run_with ~debug:(_: bool) ~freq:(hz: int) ~prog:(m: char array) : unit =
           in
 
           let extra_cycles = loop cycles_to_run 0. in
-          let elapsed_in_cycles_calc =
+          let elapsed_in_cycles =
             float_of_int (cycles_to_run + extra_cycles) *. cycle_time
           in
-
-          let elapsed_in_sys = (Unix.gettimeofday ()) -. last_clock_tick in
-
-          let elapsed_in_loop_calc =
-            if elapsed_in_sys <= elapsed_in_cycles_calc then
-              elapsed_in_cycles_calc
-            else
-              let cycles_ran_equiv =
-                elapsed_in_sys /. cycle_time |> ceil |> int_of_float
-              in
-              float_of_int cycles_ran_equiv *. cycle_time
-          in
-
-          if elapsed_in_sys > elapsed_in_loop_calc then
-            elapsed_in_sys -. elapsed_in_loop_calc |> Thread.delay;
-          clock_loop (last_clock_tick +. elapsed_in_loop_calc)
+          clock_loop (last_clock_tick +. elapsed_in_cycles)
       in
       clock_loop init
     ) booted_at
