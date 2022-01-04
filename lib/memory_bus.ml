@@ -14,7 +14,7 @@ module Make (GPU: Gpu.GPU) = struct
     Array.blit program 0 ram 0x0200 (Array.length program);
     { ram = ram; gpu = GPU.init () }
 
-  let fetch _ _ = failwith "unimplemented"
+  let fetch addr bus = bus.ram.(addr)
 
   let write_mem _ _ _ = failwith "unimplemented"
 
