@@ -1,11 +1,13 @@
   type opcode =
     | ClearScreen
 
+  type next_pc_strategy =
+    | Increment
+
   type instruction =
     { opcode: opcode
-    ; next_pc: int
     ; duration_ms: float
     }
 
-  let decode_instruction (_: int) (_: char) : instruction =
+  let decode_instruction (_: char) : instruction =
     failwith "unimplemented"

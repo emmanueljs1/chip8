@@ -1,23 +1,5 @@
 open Instruction
-
-type registers =
-  { v0: char;
-    v1: char;
-    v2: char;
-    v3: char;
-    v4: char;
-    v5: char;
-    v6: char;
-    v7: char;
-    v8: char;
-    v9: char;
-    va: char;
-    vb: char;
-    vc: char;
-    vd: char;
-    ve: char;
-    vf: char;
-  }
+open Registers
 
 type state =
   | Running
@@ -27,52 +9,38 @@ type state =
 
 module Make (GUI: Gui.GUI) = struct
   module Gpu = Gpu.Make(GUI)
+  module Memory_bus = Memory_bus.Make(Gpu)
 
   type cpu =
-    { mem: char array
+    { bus: Memory_bus.bus
     ; stack: int list
     ; gpu: Gpu.gpu
     ; sound_timer: char
     ; delay_timer: char
     ; index: int
+    ; registers: registers
     ; pc: int
     ; state: state
     }
 
-  let execute_instruction (cpu: cpu) (ins: instruction) : cpu =
-    failwith "unimplemented"
-
-  let needs_timer_update (cpu: cpu) : bool =
-    int_of_char cpu.sound_timer > 0 || int_of_char cpu.delay_timer > 0
-
-  let decr_timers (cpu: cpu) : cpu =
-    let sound_timer' = int_of_char cpu.sound_timer - 1 |> max 0 |> char_of_int in
-    let delay_timer' = int_of_char cpu.delay_timer - 1 |> max 0 |> char_of_int in
-    { cpu with sound_timer = sound_timer' ; delay_timer = delay_timer' }
-
   let boot ~program =
-    let load_font (_: char array) : unit =
-      (* TODO: implement *)
-      ()
-    in
-
-    let mem = char_of_int 0 |> Array.make 4096 in
-    load_font mem;
-    Array.blit program 0 mem 0x0200 (Array.length program);
-
-    { mem = mem
+    { bus = Memory_bus.init ~program:program
     ; stack = []
     ; gpu = Gpu.init ()
     ; sound_timer = char_of_int 0
     ; delay_timer = char_of_int 0
     ; index = 0
+    ; registers = empty_registers
     ; pc = 0
     ; state = Booted
     }
 
+  let execute_instruction (cpu: cpu) (ins: instruction) : cpu =
+    failwith "unimplemented"
+
   let step (cpu: cpu) : cpu * float =
-    let encoded_instruction = cpu.mem.(cpu.pc) in
-    let instruction = decode_instruction cpu.pc encoded_instruction in
+    let encoded_instruction = Memory_bus.fetch cpu.pc cpu.bus in
+    let instruction = decode_instruction encoded_instruction in
     let cpu' = execute_instruction cpu instruction in
     cpu', instruction.duration_ms
 
@@ -85,6 +53,20 @@ module Make (GUI: Gui.GUI) = struct
     let cpu_mutex = Mutex.create () in
 
     let timer_thread =
+      let needs_timer_update cpu =
+        int_of_char cpu.sound_timer > 0 || int_of_char cpu.delay_timer > 0
+      in
+
+      let decr_timers cpu =
+        let sound_timer' =
+          int_of_char cpu.sound_timer - 1 |> max 0 |> char_of_int
+        in
+        let delay_timer' =
+          int_of_char cpu.delay_timer - 1 |> max 0 |> char_of_int
+        in
+        { cpu with sound_timer = sound_timer' ; delay_timer = delay_timer' }
+      in
+
       Thread.create (fun init ->
         let rec timer_loop last_timer_tick =
           let now = Unix.gettimeofday () in
