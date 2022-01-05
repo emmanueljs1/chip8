@@ -7,7 +7,7 @@ module type Bus = sig
 
   val init : program:char array -> bus
 
-  val fetch_font : char -> bus -> char
+  val font_addr : int -> bus -> int
 
   val fetch_ram : int -> bus -> char
 

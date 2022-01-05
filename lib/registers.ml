@@ -36,8 +36,8 @@ let empty_registers : registers =
   ; vf = char_of_int 0
   }
 
-let reg (addr: char) (registers: registers) : char =
-  match int_of_char addr with
+let reg (hex_num: int) (registers: registers) : char =
+  match hex_num with
   | 0x0 -> registers.v0
   | 0x1 -> registers.v1
   | 0x2 -> registers.v2
@@ -55,6 +55,7 @@ let reg (addr: char) (registers: registers) : char =
   | 0xE -> registers.ve
   | 0xF -> registers.vf
   | _ ->
-    Printf.sprintf "%c is not a valid register address" addr
+    char_of_int hex_num
+    |> Printf.sprintf "%i (%c) is not a valid register address" hex_num
     |> (fun s -> Invalid_argument s)
     |> raise
