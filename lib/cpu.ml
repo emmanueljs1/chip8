@@ -2,7 +2,6 @@ open Instruction
 open Registers
 type state =
   | Running
-  | Booted
   | Paused
   | Off
 
@@ -28,7 +27,7 @@ module Make (GUI: Gui.GUI) = struct
     ; index = 0
     ; registers = empty_registers
     ; pc = 0
-    ; state = Booted
+    ; state = Running
     }
 
   let execute_instruction (cpu: cpu) (ins: instruction) : cpu =
@@ -97,7 +96,6 @@ module Make (GUI: Gui.GUI) = struct
                   float_of_int noop_updates *. timer_update_time
                 in
                 timer_loop (now +. noop_updates_elapsed);
-          | Booted -> timer_loop last_timer_tick
           | Off -> Thread.exit ()
         in
         timer_loop init
@@ -172,7 +170,6 @@ module Make (GUI: Gui.GUI) = struct
                 clock_loop (now +. noop_cycles_elapsed)
               else
                 clock_loop last_clock_tick
-          | Booted -> clock_loop last_clock_tick
           | Off -> Thread.exit ()
         in
         clock_loop init
