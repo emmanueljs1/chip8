@@ -1,6 +1,5 @@
 open Instruction
 open Registers
-
 type state =
   | Running
   | Booted
@@ -8,13 +7,11 @@ type state =
   | Off
 
 module Make (GUI: Gui.GUI) = struct
-  module Gpu = Gpu.Make(GUI)
-  module Memory_bus = Memory_bus.Make(Gpu)
+  module Bus = Memory_bus.Make(GUI)
 
   type cpu =
-    { bus: Memory_bus.bus
+    { bus: Bus.bus
     ; stack: int list
-    ; gpu: Gpu.gpu
     ; sound_timer: char
     ; delay_timer: char
     ; index: int
@@ -24,9 +21,8 @@ module Make (GUI: Gui.GUI) = struct
     }
 
   let boot ~program =
-    { bus = Memory_bus.init ~program:program
+    { bus = Bus.init ~program:program
     ; stack = []
-    ; gpu = Gpu.init ()
     ; sound_timer = char_of_int 0
     ; delay_timer = char_of_int 0
     ; index = 0
@@ -39,7 +35,7 @@ module Make (GUI: Gui.GUI) = struct
     failwith "unimplemented"
 
   let step (cpu: cpu) : cpu * float =
-    let encoded_instruction = Memory_bus.fetch cpu.pc cpu.bus in
+    let encoded_instruction = Bus.fetch_ram cpu.pc cpu.bus in
     let instruction = decode_instruction encoded_instruction in
     let cpu' = execute_instruction cpu instruction in
     cpu', instruction.duration_ms
