@@ -11,6 +11,8 @@ module type GUI = sig
 
   val mk_screen : width:int -> height:int -> gui -> screen
 
+  val clear_screen : screen -> unit
+
   val set_pixel : int -> int -> bool -> screen -> unit
 
   (* TODO: debug / external methods *)

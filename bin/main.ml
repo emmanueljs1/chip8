@@ -1,7 +1,12 @@
 open Chip8
 
 module GraphicsGui = struct
-  type screen = unit
+  type screen =
+    { pixel_width: int
+    ; pixel_height: int
+    ; screen_width: int
+    ; screen_height: int
+    }
 
   type gui = unit
 
@@ -9,20 +14,32 @@ module GraphicsGui = struct
     Graphics.open_graph "";
     ()
 
-  let pixel_width = 10
-  let pixel_height = 10
+  let clear_screen screen =
+    Graphics.set_color Graphics.black;
+    Graphics.fill_rect 0 0 screen.screen_width screen.screen_height
 
   let mk_screen ~width ~height _ =
-    Graphics.resize_window (width * pixel_width) (height * pixel_height);
-    Graphics.set_color Graphics.black;
-    Graphics.fill_rect 0 0 (width * pixel_width) (height * pixel_height)
+    let (pixel_width, pixel_height) = (10, 10) in
+    let (screen_w, screen_h) =
+      (width * pixel_width, height * pixel_height)
+    in
+    Graphics.resize_window screen_w screen_h;
+    let screen =
+      { pixel_width = pixel_width
+      ; pixel_height = pixel_height
+      ; screen_width = screen_w
+      ; screen_height = screen_h
+      }
+    in
+    clear_screen screen;
+    screen
 
-  let set_pixel x y on _ =
+  let set_pixel x y on screen =
     let color = if on then Graphics.white else Graphics.black in
     Graphics.set_color color;
-    let x' = x * pixel_width in
-    let y' = y * pixel_height in
-    Graphics.fill_rect x' y' pixel_width pixel_height
+    let x' = x * screen.pixel_width in
+    let y' = y * screen.pixel_height in
+    Graphics.fill_rect x' y' screen.pixel_width screen.pixel_height
 
   let is_key_pressed = Graphics.key_pressed
 

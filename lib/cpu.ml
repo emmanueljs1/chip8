@@ -1,5 +1,6 @@
 open Instruction
-open Registers
+module Registers = Registers.R
+
 type state =
   | Running
   | Paused
@@ -14,7 +15,7 @@ module Make (GUI: Gui.GUI) = struct
     ; sound_timer: char
     ; delay_timer: char
     ; index: int
-    ; registers: registers
+    ; registers: Registers.registers
     ; pc: int
     ; state: state
     ; gui: GUI.gui
@@ -28,18 +29,38 @@ module Make (GUI: Gui.GUI) = struct
     ; sound_timer = char_of_int 0
     ; delay_timer = char_of_int 0
     ; index = 0
-    ; registers = empty_registers
+    ; registers = Registers.empty ()
     ; pc = 0
     ; state = Running
     ; gui = gui
     }
 
   let execute_instruction (cpu: cpu) (ins: instruction) : cpu =
-    failwith "unimplemented"
+    let pc' = cpu.pc + 2 in
+    match ins.opcode with
+    | ClearScreen ->
+        Bus.gpu cpu.bus |> Bus.clear_vram;
+        { cpu with pc = pc' }
+    | Jump addr ->
+        { cpu with pc = addr }
+    | SetRegToValue (x, value) ->
+        Registers.set_register x value cpu.registers;
+        { cpu with pc = pc' }
+    | AddValueToReg (x, value) ->
+        let value_to_add = int_of_char value in
+        let current_value = Registers.register x cpu.registers |> int_of_char in
+        let new_value = value_to_add + current_value in
+        Registers.set_register x (char_of_int new_value) cpu.registers;
+        { cpu with pc = pc' }
+    | SetIndexToValue value ->
+        { cpu with index = value; pc = pc' }
 
   let step (cpu: cpu) : cpu * float =
-    let encoded_instruction = Bus.fetch_ram cpu.pc cpu.bus in
-    let instruction = decode_instruction encoded_instruction in
+    let (byte1, byte2) =
+      Bus.fetch_ram cpu.pc cpu.bus,
+      Bus.fetch_ram (cpu.pc + 1) cpu.bus
+    in
+    let instruction = decode_instruction byte1 byte2 in
     let cpu' = execute_instruction cpu instruction in
     cpu', instruction.duration_ms
 

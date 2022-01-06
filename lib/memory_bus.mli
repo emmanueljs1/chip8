@@ -13,7 +13,9 @@ module Make (GUI: Gui.GUI) : sig
 
   val write_ram : int -> char -> bus -> unit
 
-  val fetch_vram : int -> int -> bus -> bool
+  val fetch_vram : int -> int -> gpu -> bool
 
-  val write_vram : int -> int -> bool -> bus -> unit
+  val write_vram : int -> int -> bool -> gpu -> unit
+
+  val clear_vram : gpu -> unit
 end
