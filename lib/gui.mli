@@ -5,7 +5,9 @@ module type GUI = sig
 
   val mk : unit -> gui
 
-  val is_key_pressed : int -> gui -> unit
+  val is_key_pressed : gui -> bool
+
+  val read_key : gui -> char
 
   val mk_screen : width:int -> height:int -> gui -> screen
 
