@@ -39,7 +39,7 @@ module Make (GUI: Gui.GUI) = struct
 
   let init ~program ~gui =
     let ram = char_of_int 0 |> Array.make 4096 in
-    Array.blit fonts 0 ram font_start_addr font_end_addr;
+    Array.blit fonts 0 ram font_start_addr (Array.length fonts);
     Array.blit program 0 ram 0x0200 (Array.length program);
 
     let vram = Array.make 2048 false in
