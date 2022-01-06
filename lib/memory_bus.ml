@@ -1,23 +1,3 @@
-module type Bus = sig
-  type gpu
-
-  type bus
-
-  val gpu : bus -> gpu
-
-  val init : program:char array -> bus
-
-  val font_addr : int -> bus -> int
-
-  val fetch_ram : int -> bus -> char
-
-  val write_ram : int -> char -> bus -> unit
-
-  val write_vram : int -> bool -> bus -> unit
-
-  val render : gpu -> unit
-end
-
 let fonts =
   Array.of_list [
     0xF0; 0x90; 0x90; 0x90; 0xF0; (* 0 *)
@@ -41,8 +21,14 @@ let fonts =
 let font_start_addr = 0x050
 let font_end_addr = 0x090
 
+let screen_width = 64
+let screen_height = 32
+
 module Make (GUI: Gui.GUI) = struct
-  type gpu = bool array
+  type gpu =
+    { vram: bool array
+    ; display: GUI.screen
+    }
 
   type bus =
     { ram: char array
@@ -51,16 +37,20 @@ module Make (GUI: Gui.GUI) = struct
 
   let gpu bus = bus.gpu
 
-  let init ~program =
+  let init ~program ~gui =
     let ram = char_of_int 0 |> Array.make 4096 in
     Array.blit fonts 0 ram font_start_addr font_end_addr;
     Array.blit program 0 ram 0x0200 (Array.length program);
 
     let vram = Array.make 2048 false in
+    let display =
+      GUI.mk_screen ~width:screen_width ~height:screen_height gui
+    in
+    let gpu = { vram = vram; display = display } in
 
-    { ram = ram; gpu = vram }
+    { ram = ram; gpu = gpu}
 
-  let font_addr hex_num bus =
+  let font_addr hex_num _ =
     if hex_num >= 0x0 && hex_num <= 0xF then
       font_start_addr + (hex_num * 5)
     else
@@ -73,7 +63,12 @@ module Make (GUI: Gui.GUI) = struct
 
   let write_ram addr byte bus = bus.ram.(addr) <- byte
 
-  let write_vram addr on bus = bus.gpu.(addr) <- on
+  let fetch_vram x y bus =
+    let addr = (screen_width * x) + y in
+    bus.gpu.vram.(addr)
 
-  let render _ = failwith "unimplemented"
+  let write_vram x y on bus =
+    let addr = (screen_width * x) + y in
+    bus.gpu.vram.(addr) <- on;
+    GUI.set_pixel x y on bus.gpu.display
 end

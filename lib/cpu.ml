@@ -17,10 +17,13 @@ module Make (GUI: Gui.GUI) = struct
     ; registers: registers
     ; pc: int
     ; state: state
+    ; gui: GUI.gui
     }
 
   let boot ~program =
-    { bus = Bus.init ~program:program
+    let gui = GUI.mk () in
+
+    { bus = Bus.init ~program:program ~gui:gui
     ; stack = []
     ; sound_timer = char_of_int 0
     ; delay_timer = char_of_int 0
@@ -28,6 +31,7 @@ module Make (GUI: Gui.GUI) = struct
     ; registers = empty_registers
     ; pc = 0
     ; state = Running
+    ; gui = gui
     }
 
   let execute_instruction (cpu: cpu) (ins: instruction) : cpu =
@@ -176,7 +180,7 @@ module Make (GUI: Gui.GUI) = struct
       ) booted_at
     in
 
-    (* TODO: user input thread to turn off CPU *)
+    (* TODO: user input poll thread (debug + external) *)
 
     Thread.join clock_thread;
     Thread.join timer_thread

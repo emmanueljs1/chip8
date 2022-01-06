@@ -1,11 +1,11 @@
-module type Bus = sig
+module Make (GUI: Gui.GUI) : sig
   type gpu
 
   type bus
 
   val gpu : bus -> gpu
 
-  val init : program:char array -> bus
+  val init : program:char array -> gui:GUI.gui-> bus
 
   val font_addr : int -> bus -> int
 
@@ -13,9 +13,7 @@ module type Bus = sig
 
   val write_ram : int -> char -> bus -> unit
 
-  val write_vram : int -> bool -> bus -> unit
+  val fetch_vram : int -> int -> bus -> bool
 
-  val render : gpu -> unit
+  val write_vram : int -> int -> bool -> bus -> unit
 end
-
-module Make (GUI: Gui.GUI) : Bus
