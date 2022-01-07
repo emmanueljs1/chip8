@@ -46,28 +46,22 @@ module GraphicsGui = struct
   let read_key = Graphics.read_key
 end
 
-let () =
-  let args = Sys.argv in
-  let debug = Array.exists (fun s -> s = "--debug") args in
+let args_opt (f: string -> 'a) (fallback: 'a) (opt: string) (args: string array) : 'a =
+  let arg_opt = Printf.sprintf "--%s" opt in
+  match Array.find_opt (String.starts_with ~prefix:arg_opt) args with
+  | None -> fallback
+  | Some(s) ->
+      Printf.sprintf "arg_opt: %s, found: %s" arg_opt s |> print_endline;
+      begin match String.split_on_char '=' s with
+      | [arg_opt_str; opt_str] when arg_opt_str = arg_opt ->
+          begin try f opt_str with _ -> fallback end
+      | _ -> fallback
+      end
 
-  if debug then Printexc.record_backtrace true;
-
-  let frequency =
-    let fallback = 600 in
-    match Array.find_opt (fun s -> String.starts_with ~prefix:"--frequency" s) args with
-    | None -> fallback
-    | Some(s) ->
-        begin match String.split_on_char '=' s with
-        | ["--frequency"; freq_str] ->
-            begin try int_of_string freq_str with _ -> fallback end
-        | _ -> fallback
-        end
-  in
-
-
+let load_rom (filename: string) : char array =
   let program = Array.make (4096 - 0x200) (char_of_int 0) in
   let _ =
-    let ic = open_in_bin "roms/ibm_logo.ch8" in
+    let ic = open_in_bin filename in
     let rec loop n =
       if n >= 4096 - 0x200 then ()
       else
@@ -79,7 +73,18 @@ let () =
     in
     loop 0
   in
+  program
 
+let () =
   let module Cpu = Cpu.Make(GraphicsGui) in
+
+  let args = Sys.argv in
+  let debug = Array.exists (fun s -> s = "--debug") args in
+
+  if debug then Printexc.record_backtrace true;
+  let frequency = args_opt int_of_string 600 "frequency" args in
+  let rom_filename = args_opt (fun s -> s) "roms/test.ch8" "rom" args in
+
+  let program = load_rom rom_filename in
   let cpu = Cpu.boot ~program:program in
   Cpu.run ~debug:debug ~frequency:frequency cpu
