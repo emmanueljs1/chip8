@@ -38,7 +38,7 @@ module GraphicsGui = struct
     let color = if on then Graphics.white else Graphics.black in
     Graphics.set_color color;
     let x' = x * screen.pixel_width in
-    let y' = y * screen.pixel_height in
+    let y' = y * screen.pixel_height + screen.pixel_height in
     Graphics.fill_rect x' y' screen.pixel_width screen.pixel_height
 
   let is_key_pressed = Graphics.key_pressed
@@ -49,6 +49,9 @@ end
 let () =
   let args = Sys.argv in
   let debug = Array.exists (fun s -> s = "--debug") args in
+
+  if debug then Printexc.record_backtrace true;
+
   let frequency =
     let fallback = 600 in
     match Array.find_opt (fun s -> String.starts_with ~prefix:"--frequency" s) args with
@@ -60,7 +63,23 @@ let () =
         | _ -> fallback
         end
   in
-  let program = char_of_int 0x00E0 |> Array.make 100 in
+
+
+  let program = Array.make (4096 - 0x200) (char_of_int 0) in
+  let _ =
+    let ic = open_in_bin "roms/ibm_logo.ch8" in
+    let rec loop n =
+      if n >= 4096 - 0x200 then ()
+      else
+        try
+          let byte = input_byte ic in
+          program.(n) <- char_of_int byte;
+          loop (n + 1)
+        with End_of_file -> ()
+    in
+    loop 0
+  in
+
   let module Cpu = Cpu.Make(GraphicsGui) in
   let cpu = Cpu.boot ~program:program in
   Cpu.run ~debug:debug ~frequency:frequency cpu

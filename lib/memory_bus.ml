@@ -26,6 +26,8 @@ let screen_height = 32
 
 let screen_size = screen_width * screen_height
 
+let program_start_addr = 0x0200
+
 module Make (GUI: Gui.GUI) = struct
   type gpu =
     { vram: bool array
@@ -39,10 +41,15 @@ module Make (GUI: Gui.GUI) = struct
 
   let gpu bus = bus.gpu
 
+  let program_start _ = program_start_addr
+
   let init ~program ~gui =
     let ram = char_of_int 0 |> Array.make 4096 in
     Array.blit fonts 0 ram font_start_addr (Array.length fonts);
-    Array.blit program 0 ram 0x0200 (Array.length program);
+    let bytes_to_copy =
+      min (4096 - program_start_addr) (Array.length program)
+    in
+    Array.blit program 0 ram program_start_addr bytes_to_copy;
 
     let vram = Array.make screen_size false in
     let display =
@@ -65,12 +72,14 @@ module Make (GUI: Gui.GUI) = struct
 
   let write_ram addr byte bus = bus.ram.(addr) <- byte
 
+  let screen_dim _ = screen_width, screen_height
+
   let fetch_vram x y gpu =
-    let addr = (screen_width * x) + y in
+    let addr = (screen_width * y) + x in
     gpu.vram.(addr)
 
   let write_vram x y on gpu =
-    let addr = (screen_width * x) + y in
+    let addr = (screen_width * y) + x in
     gpu.vram.(addr) <- on;
     GUI.set_pixel x y on gpu.display
 

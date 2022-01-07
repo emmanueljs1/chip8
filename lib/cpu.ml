@@ -23,14 +23,15 @@ module Make (GUI: Gui.GUI) = struct
 
   let boot ~program =
     let gui = GUI.mk () in
+    let bus = Bus.init ~program:program ~gui:gui in
 
-    { bus = Bus.init ~program:program ~gui:gui
+    { bus = bus
     ; stack = []
     ; sound_timer = char_of_int 0
     ; delay_timer = char_of_int 0
     ; index = 0
     ; registers = Registers.empty ()
-    ; pc = 0
+    ; pc = Bus.program_start bus
     ; state = Running
     ; gui = gui
     }
@@ -54,6 +55,47 @@ module Make (GUI: Gui.GUI) = struct
         { cpu with pc = pc' }
     | SetIndexToValue value ->
         { cpu with index = value; pc = pc' }
+    | Display (r1, r2, n) ->
+        let gpu = Bus.gpu cpu.bus in
+        let (w, h) = Bus.screen_dim gpu in
+        let vx = (Registers.register r1 cpu.registers |> int_of_char) mod w in
+        let vy = (Registers.register r2 cpu.registers |> int_of_char) mod h in
+        let sprite_addr = cpu.index in
+        let rec loop row col x y sprite_byte flag =
+          if row >= n || y >= h then
+            flag
+          else if col >= 8 || x >= w then
+            let row' = row + 1 in
+            let sprite_byte' = Bus.fetch_ram (sprite_addr + row') cpu.bus in
+            loop row' 0 vx (y + 1) sprite_byte' flag
+          else
+            let bit = int_of_char sprite_byte |> (fun i ->
+              (i lsr (7 - col)) land 1
+            )
+            in
+            let flag' =
+              if bit = 1 then
+                if Bus.fetch_vram x y gpu then (
+                  Bus.write_vram x y false gpu;
+                  true
+                ) else (
+                  Bus.write_vram x y true gpu;
+                  false
+                )
+              else
+                false
+            in
+            loop row (col + 1) (x + 1) y sprite_byte flag'
+        in
+        let sprite_byte = Bus.fetch_ram sprite_addr cpu.bus in
+        let flag =
+          if loop 0 0 vx vy sprite_byte false then
+            1
+          else
+            0
+        in
+        Registers.set_register 0xF (char_of_int flag) cpu.registers;
+        { cpu with pc = pc' }
 
   let step (cpu: cpu) : cpu * float =
     let (byte1, byte2) =
