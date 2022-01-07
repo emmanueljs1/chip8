@@ -50,7 +50,7 @@ module Make (GUI: Gui.GUI) = struct
     | AddValueToReg (x, value) ->
         let value_to_add = int_of_char value in
         let current_value = Registers.register x cpu.registers |> int_of_char in
-        let new_value = value_to_add + current_value in
+        let new_value = value_to_add + current_value mod 256 in
         Registers.set_register x (char_of_int new_value) cpu.registers;
         { cpu with pc = pc' }
     | SetIndexToValue value ->
@@ -95,6 +95,45 @@ module Make (GUI: Gui.GUI) = struct
             0
         in
         Registers.set_register 0xF (char_of_int flag) cpu.registers;
+        { cpu with pc = pc' }
+    | EnterSubroutine addr ->
+        { cpu with pc = addr; stack = cpu.pc :: cpu.stack }
+    | ReturnFromSubroutine ->
+        let addr, stack' =
+          match cpu.stack with
+          | addr :: tl -> addr, tl
+          | _ -> raise Not_found
+        in
+        { cpu with pc = addr; stack = stack' }
+    | SkipIfRegHasValue (reg, value) ->
+        let reg_value = Registers.register reg cpu.registers in
+        if reg_value = value then
+          { cpu with pc = cpu.pc + 4 }
+        else
+          { cpu with pc = pc' }
+    | SkipIfRegDoesNotHaveValue (reg, value) ->
+        let reg_value = Registers.register reg cpu.registers in
+        if reg_value <> value then
+          { cpu with pc = cpu.pc + 4 }
+        else
+          { cpu with pc = pc' }
+    | SkipIfRegsEqual (x, y) ->
+        let vx = Registers.register x cpu.registers in
+        let vy = Registers.register y cpu.registers in
+        if vx = vy then
+          { cpu with pc = cpu.pc + 4 }
+        else
+          { cpu with pc = pc' }
+    | SkipIfRegsNotEqual (x, y) ->
+        let vx = Registers.register x cpu.registers in
+        let vy = Registers.register y cpu.registers in
+        if vx <> vy then
+          { cpu with pc = cpu.pc + 4 }
+        else
+          { cpu with pc = pc' }
+    | SetRegToReg (x, y) ->
+        let vy = Registers.register y cpu.registers in
+        Registers.set_register x vy cpu.registers;
         { cpu with pc = pc' }
 
   let step (cpu: cpu) : cpu * float =
