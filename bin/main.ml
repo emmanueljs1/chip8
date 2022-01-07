@@ -39,7 +39,7 @@ module GraphicsGui = struct
     Graphics.set_color color;
     let x' = x * screen.pixel_width in
     let y' = y * screen.pixel_height + screen.pixel_height in
-    Graphics.fill_rect x' y' screen.pixel_width screen.pixel_height
+    Graphics.fill_rect x' (screen.screen_height - y') screen.pixel_width screen.pixel_height
 
   let is_key_pressed = Graphics.key_pressed
 
