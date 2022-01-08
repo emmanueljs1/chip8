@@ -28,6 +28,9 @@ type opcode =
   | SkipIfKey of int * bool
   | GetKey of int
   | FontCharacter of int
+  | DecimalConversion of int
+  | Store of int
+  | Load of int
 
 type instruction =
   { opcode: opcode
@@ -41,6 +44,8 @@ let int_of_hexes (h1: char) (h2: char) (h3: char) : int =
   let lower = Hex.to_char h2 h3 |> int_of_char in
   upper + lower
 
+(* ms duration based off https://jackson-s.me/2019/07/13/Chip-8-Instruction-Scheduling-and-Frequency.html
+ * note that the average time is used and the variance is ignored *)
 let decode_instruction (byte1: char) (byte2: char) : instruction =
   let (c1, c2), (c3, c4) = Hex.of_char byte1, Hex.of_char byte2 in
   let hex_encodings = List.map Char.uppercase_ascii [c1; c2; c3; c4] in
@@ -113,6 +118,13 @@ let decode_instruction (byte1: char) (byte2: char) : instruction =
   | ['F'; x; '2'; '9'], _ ->
       let vx = int_of_hex x in
       { opcode = FontCharacter vx; duration_ms = 91. }
+  | ['F'; x; '3'; '3'], _ ->
+      let vx = int_of_hex x in
+      { opcode = DecimalConversion vx; duration_ms = 927. }
+  | ['F'; x; '5' as h; '5'], _ | ['F'; x; '6' as h; '5'], _ ->
+      let vx = int_of_hex x in
+      let opcode = if h = '5' then Store vx else Load vx in
+      { opcode = opcode; duration_ms = 605. }
   | _, unsupported ->
       Printf.sprintf "Warning: unsupported instruction %s" unsupported |> print_endline;
       { opcode = Noop; duration_ms = 0. }

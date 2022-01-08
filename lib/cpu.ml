@@ -222,6 +222,39 @@ module Make (GUI: Gui.GUI) = struct
         let font = (int_of_char vx) land 0xF in
         let addr = Bus.font_addr font cpu.bus in
         { cpu with index = addr; pc = pc' }
+    | DecimalConversion x ->
+        let vx = Registers.register x cpu.registers |> int_of_char in
+        let dig1 = vx / 100 in
+        let wihout_hundreds = vx - (dig1 * 100) |> max 0 in
+        let dig2 = wihout_hundreds / 10 in
+        let dig3 = wihout_hundreds - (dig2 * 10) |> max 0 in
+        Bus.write_ram cpu.index (char_of_int dig1) cpu.bus;
+        Bus.write_ram (cpu.index + 1) (char_of_int dig2) cpu.bus;
+        Bus.write_ram (cpu.index + 2) (char_of_int dig3) cpu.bus;
+        { cpu with pc = pc' }
+    | Store x ->
+        let rec loop i =
+          if i > x then
+            ()
+          else (
+            let vx = Registers.register (x + i) cpu.registers in
+            Bus.write_ram (cpu.index + i) vx cpu.bus;
+            loop (i + 1)
+          )
+        in
+        loop 0;
+        { cpu with pc = pc' }
+    | Load x ->
+        let rec loop i =
+          if i > x then
+            ()
+          else
+            let byte = Bus.fetch_ram (cpu.index + i) cpu.bus in
+            Registers.set_register (x + i) byte cpu.registers;
+            loop (i + 1)
+        in
+        loop 0;
+        { cpu with pc = pc' }
     | Noop -> { cpu with pc = pc' }
 
   let step (cpu: cpu) : cpu * float =
