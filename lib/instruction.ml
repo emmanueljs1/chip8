@@ -15,20 +15,17 @@ let binary_op_of_hex (code: char): binary_op option =
 type opcode =
   | Noop
   | ClearScreen
-  | Jump of int
   | SetRegToValue of int * char
   | AddValueToReg of int * char
   | SetIndexToValue of int
   | Display of int * int * int
   | EnterSubroutine of int
   | ReturnFromSubroutine
-  | SkipIfRegHasValue of int * char
-  | SkipIfRegDoesNotHaveValue of int * char
-  | SkipIfRegsEqual of int * int
-  | SkipIfRegsNotEqual of int * int
+  | SkipIfRegHasValue of int * char * bool
+  | SkipIfRegsAreEqual of int * int * bool
   | SetRegToReg of int * int
   | BinaryOp of int * binary_op * int
-  | JumpWithOffset of int
+  | JumpWithOffset of int * bool
   | Random of int * char
   | SkipIfKey of int * bool
 
@@ -49,9 +46,10 @@ let decode_instruction (byte1: char) (byte2: char) : instruction =
   let hex_encodings = List.map Char.uppercase_ascii [c1; c2; c3; c4] in
   match hex_encodings, String.init 4 (List.nth hex_encodings) with
   | _, "00E0" -> { opcode = ClearScreen; duration_ms = 109. }
-  | '1' :: [h1; h2; h3], _ ->
+  | ['1' as h; h1; h2; h3], _ | ['B' as h; h1; h2; h3], _ ->
+      let with_offset = h = 'B' in
       let addr = int_of_hexes h1 h2 h3 in
-      { opcode = Jump addr ; duration_ms = 105. }
+      { opcode = JumpWithOffset (addr, with_offset) ; duration_ms = 105. }
   | ['6'; x; h1; h2], _ ->
       let reg = int_of_hex x in
       let value = Hex.to_char h1 h2 in
@@ -70,22 +68,17 @@ let decode_instruction (byte1: char) (byte2: char) : instruction =
   | ['2'; h1; h2; h3], _ ->
       let addr = int_of_hexes h1 h2 h3 in
       { opcode = EnterSubroutine addr; duration_ms = 105. }
-  | _, "00ee" ->
+  | _, "00EE" ->
       { opcode = ReturnFromSubroutine; duration_ms = 105. }
-  | ['3'; x; h1; h2], _ ->
+  | ['3' as h; x; h1; h2], _ | ['4' as h; x; h1; h2], _ ->
+      let has_value = h = '3' in
       let reg = int_of_hex x in
       let value = Hex.to_char h1 h2 in
-      { opcode = SkipIfRegHasValue (reg, value); duration_ms = 55. }
-  | ['4'; x; h1; h2], _ ->
-      let reg = int_of_hex x in
-      let value = Hex.to_char h1 h2 in
-      { opcode = SkipIfRegDoesNotHaveValue (reg, value); duration_ms = 55. }
-  | ['5'; x; y; '0'], _ ->
+      { opcode = SkipIfRegHasValue (reg, value, has_value); duration_ms = 55. }
+  | ['5' as h; x; y; '0'], _ | ['9' as h; x; y; '0'], _ ->
+      let are_equal = h = '5' in
       let vx, vy = int_of_hex x, int_of_hex y in
-      { opcode = SkipIfRegsEqual (vx, vy); duration_ms = 73. }
-  | ['9'; x; y; '0'], _ ->
-      let vx, vy = int_of_hex x, int_of_hex y in
-      { opcode = SkipIfRegsNotEqual (vx, vy); duration_ms = 73. }
+      { opcode = SkipIfRegsAreEqual (vx, vy, are_equal); duration_ms = 73. }
   | ['8'; x; y; '0'], _ ->
       let vx, vy = int_of_hex x, int_of_hex y in
       { opcode = SetRegToReg (vx, vy); duration_ms = 200. }
@@ -93,10 +86,6 @@ let decode_instruction (byte1: char) (byte2: char) : instruction =
       let binary_op = binary_op_of_hex h |> Option.get in
       let vx, vy = int_of_hex x, int_of_hex y in
       { opcode = BinaryOp (vx, binary_op, vy); duration_ms = 200. }
-  | ['B'; h1; h2; h3], _ ->
-      let addr = int_of_hexes h1 h2 h3 in
-      (* TODO: support alternate behavior *)
-      { opcode = JumpWithOffset addr; duration_ms = 105. }
   | ['C'; x; h1; h2], _ ->
       let vx = int_of_hex x in
       let value = Hex.to_char h1 h2 in

@@ -43,8 +43,6 @@ module Make (GUI: Gui.GUI) = struct
     | ClearScreen ->
         Bus.gpu cpu.bus |> Bus.clear_vram;
         { cpu with pc = pc' }
-    | Jump addr ->
-        { cpu with pc = addr }
     | SetRegToValue (x, value) ->
         Registers.set_register x value cpu.registers;
         { cpu with pc = pc' }
@@ -106,29 +104,16 @@ module Make (GUI: Gui.GUI) = struct
           | _ -> raise Not_found
         in
         { cpu with pc = addr; stack = stack' }
-    | SkipIfRegHasValue (reg, value) ->
+    | SkipIfRegHasValue (reg, value, has_value) ->
         let reg_value = Registers.register reg cpu.registers in
-        if reg_value = value then
+        if (reg_value = value) = has_value then
           { cpu with pc = cpu.pc + 4 }
         else
           { cpu with pc = pc' }
-    | SkipIfRegDoesNotHaveValue (reg, value) ->
-        let reg_value = Registers.register reg cpu.registers in
-        if reg_value <> value then
-          { cpu with pc = cpu.pc + 4 }
-        else
-          { cpu with pc = pc' }
-    | SkipIfRegsEqual (x, y) ->
+    | SkipIfRegsAreEqual (x, y, are_equal) ->
         let vx = Registers.register x cpu.registers in
         let vy = Registers.register y cpu.registers in
-        if vx = vy then
-          { cpu with pc = cpu.pc + 4 }
-        else
-          { cpu with pc = pc' }
-    | SkipIfRegsNotEqual (x, y) ->
-        let vx = Registers.register x cpu.registers in
-        let vy = Registers.register y cpu.registers in
-        if vx <> vy then
+        if (vx = vy) = are_equal then
           { cpu with pc = cpu.pc + 4 }
         else
           { cpu with pc = pc' }
@@ -166,8 +151,13 @@ module Make (GUI: Gui.GUI) = struct
         in
         Registers.set_register x (char_of_int vx') cpu.registers;
         { cpu with pc = pc' }
-    | JumpWithOffset addr ->
-        let offset = Registers.register 0x0 cpu.registers |> int_of_char in
+    | JumpWithOffset (addr, with_offset) ->
+        let offset =
+          if with_offset then
+            Registers.register 0x0 cpu.registers |> int_of_char
+          else
+            0
+        in
         { cpu with pc = addr + offset }
     | Random (x, value) ->
         let rand = Random.int 256 in

@@ -6,6 +6,10 @@ type binary_op =
   | Subtract of bool
   | Shift of bool
 
+let is_hex (c: char) : bool =
+  let i = int_of_char c in
+  i >= 0x0 && i <= 0xF
+
 let key_opt_of_char (c: char) : char option =
   let value_opt =
   match c with
