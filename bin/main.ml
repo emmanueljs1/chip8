@@ -51,7 +51,6 @@ let args_opt (f: string -> 'a) (fallback: 'a) (opt: string) (args: string array)
   match Array.find_opt (String.starts_with ~prefix:arg_opt) args with
   | None -> fallback
   | Some(s) ->
-      Printf.sprintf "arg_opt: %s, found: %s" arg_opt s |> print_endline;
       begin match String.split_on_char '=' s with
       | [arg_opt_str; opt_str] when arg_opt_str = arg_opt ->
           begin try f opt_str with _ -> fallback end
