@@ -1,4 +1,5 @@
 open Instruction
+open Util
 module Registers = Registers.R
 
 type state =
@@ -173,6 +174,17 @@ module Make (GUI: Gui.GUI) = struct
         let res = (int_of_char value) land rand |> char_of_int in
         Registers.set_register x res cpu.registers;
         { cpu with pc = pc' }
+    | SkipIfKey (x, if_key_pressed) ->
+        let pc'' =
+          if GUI.is_key_pressed cpu.gui then
+            let vx = Registers.register x cpu.registers in
+            match GUI.read_key cpu.gui |> key_opt_of_char with
+            | Some key when (key = vx) = if_key_pressed -> pc' + 2
+            | _ -> pc'
+          else
+            pc'
+        in
+        { cpu with pc = pc'' }
     | Noop -> { cpu with pc = pc' }
 
   let step (cpu: cpu) : cpu * float =

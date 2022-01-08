@@ -1,10 +1,4 @@
-type binary_op =
-  | Or
-  | And
-  | Xor
-  | Add
-  | Subtract of bool
-  | Shift of bool
+open Util
 
 let binary_op_of_hex (code: char): binary_op option =
   match code with
@@ -36,6 +30,7 @@ type opcode =
   | BinaryOp of int * binary_op * int
   | JumpWithOffset of int
   | Random of int * char
+  | SkipIfKey of int * bool
 
 type instruction =
   { opcode: opcode
@@ -106,6 +101,10 @@ let decode_instruction (byte1: char) (byte2: char) : instruction =
       let vx = int_of_hex x in
       let value = Hex.to_char h1 h2 in
       { opcode = Random (vx, value); duration_ms = 164. }
+  | ['E'; x; '9' as h; 'E'], _ | ['E'; x; 'A' as h; '1'], _ ->
+      let vx = int_of_hex x in
+      let if_key_pressed = h = '9' in
+      { opcode = SkipIfKey (vx, if_key_pressed); duration_ms = 73. }
   | _, unsupported ->
       Printf.sprintf "Warning: unsupported instruction %s" unsupported |> print_endline;
       { opcode = Noop; duration_ms = 0. }
