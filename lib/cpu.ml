@@ -207,6 +207,21 @@ module Make (GUI: Gui.GUI) = struct
             pc'
         in
         { cpu with pc = pc'' }
+    | GetKey x ->
+        (* TODO: consider only progressing if key released *)
+        if GUI.is_key_pressed cpu.gui then
+          match GUI.read_key cpu.gui |> key_opt_of_char with
+          | Some key ->
+              Registers.set_register x key cpu.registers;
+              { cpu with pc = pc' }
+          | None -> cpu
+        else
+          cpu
+    | FontCharacter x ->
+        let vx = Registers.register x cpu.registers in
+        let font = (int_of_char vx) land 0xF in
+        let addr = Bus.font_addr font cpu.bus in
+        { cpu with index = addr; pc = pc' }
     | Noop -> { cpu with pc = pc' }
 
   let step (cpu: cpu) : cpu * float =

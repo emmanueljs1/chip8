@@ -26,6 +26,8 @@ type opcode =
   | JumpWithOffset of int * bool
   | Random of int * char
   | SkipIfKey of int * bool
+  | GetKey of int
+  | FontCharacter of int
 
 type instruction =
   { opcode: opcode
@@ -105,6 +107,12 @@ let decode_instruction (byte1: char) (byte2: char) : instruction =
   | ['F'; x; '1'; 'E'], _ ->
       let vx = int_of_hex x in
       { opcode = Set (Reg vx, Index); duration_ms = 86. }
+  | ['F'; x; '0'; 'A'], _ ->
+      let vx = int_of_hex x in
+      { opcode = GetKey vx; duration_ms = 0. }
+  | ['F'; x; '2'; '9'], _ ->
+      let vx = int_of_hex x in
+      { opcode = FontCharacter vx; duration_ms = 91. }
   | _, unsupported ->
       Printf.sprintf "Warning: unsupported instruction %s" unsupported |> print_endline;
       { opcode = Noop; duration_ms = 0. }
