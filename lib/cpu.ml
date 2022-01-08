@@ -43,17 +43,52 @@ module Make (GUI: Gui.GUI) = struct
     | ClearScreen ->
         Bus.gpu cpu.bus |> Bus.clear_vram;
         { cpu with pc = pc' }
-    | SetRegToValue (x, value) ->
-        Registers.set_register x value cpu.registers;
-        { cpu with pc = pc' }
-    | AddValueToReg (x, value) ->
-        let value_to_add = int_of_char value in
-        let current_value = Registers.register x cpu.registers |> int_of_char in
-        let new_value = value_to_add + current_value mod 256 in
-        Registers.set_register x (char_of_int new_value) cpu.registers;
-        { cpu with pc = pc' }
-    | SetIndexToValue value ->
-        { cpu with index = value; pc = pc' }
+    | Set (source, dest) ->
+        let source_value =
+          match source with
+          | Reg reg -> Registers.register reg cpu.registers |> int_of_char
+          | Lit value -> value
+          | RawByte c -> int_of_char c
+          | DelayTimer -> cpu.delay_timer |> int_of_char
+        in
+        let cpu' =
+          match source, dest with
+          | Reg _, Reg reg | RawByte _, Reg reg | DelayTimer, Reg reg ->
+              let value = char_of_int source_value in
+              Registers.set_register reg value cpu.registers;
+              cpu
+          | Reg _, DelayTimer->
+              { cpu with delay_timer = source_value mod 255 |> char_of_int }
+          | Reg _, SoundTimer->
+              { cpu with sound_timer = source_value mod 255 |> char_of_int }
+          | Lit _, Index ->
+              { cpu with index = source_value }
+          | _ -> failwith "invalid source/dest combination for set instruction"
+        in
+        { cpu' with pc = pc' }
+    | Add (source, dest) ->
+        let value_to_add =
+          match source with
+          | Reg reg -> Registers.register reg cpu.registers |> int_of_char
+          | RawByte c -> int_of_char c
+        in
+        let current_value =
+          match dest with
+          | Reg reg -> Registers.register reg cpu.registers |> int_of_char
+          | Index -> cpu.index
+        in
+        let cpu' =
+          match source, dest with
+          | RawByte _, Reg reg ->
+              let new_value = (current_value + value_to_add) mod 255 in
+              Registers.set_register reg (char_of_int new_value) cpu.registers;
+              cpu
+          | Reg _, Index ->
+              (* TODO: support ambiguous behavior *)
+              { cpu with index = current_value + value_to_add }
+          | _ -> failwith "invalid source/dest combination for add instruction"
+        in
+        { cpu' with pc = pc' }
     | Display (r1, r2, n) ->
         let gpu = Bus.gpu cpu.bus in
         let (w, h) = Bus.screen_dim gpu in
@@ -117,10 +152,6 @@ module Make (GUI: Gui.GUI) = struct
           { cpu with pc = cpu.pc + 4 }
         else
           { cpu with pc = pc' }
-    | SetRegToReg (x, y) ->
-        let vy = Registers.register y cpu.registers in
-        Registers.set_register x vy cpu.registers;
-        { cpu with pc = pc' }
     | BinaryOp (x, binary_op, y) ->
         let vx = Registers.register x cpu.registers |> int_of_char in
         let vy = Registers.register y cpu.registers |> int_of_char in
@@ -154,6 +185,7 @@ module Make (GUI: Gui.GUI) = struct
     | JumpWithOffset (addr, with_offset) ->
         let offset =
           if with_offset then
+            (* TODO: support ambiguous behavior *)
             Registers.register 0x0 cpu.registers |> int_of_char
           else
             0

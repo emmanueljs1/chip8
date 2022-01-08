@@ -6,9 +6,25 @@ type binary_op =
   | Subtract of bool
   | Shift of bool
 
-let is_hex (c: char) : bool =
-  let i = int_of_char c in
-  i >= 0x0 && i <= 0xF
+type set_source =
+  | Reg of int
+  | Lit of int
+  | RawByte of char
+  | DelayTimer
+
+type set_dest =
+  | Reg of int
+  | DelayTimer
+  | SoundTimer
+  | Index
+
+type add_source =
+  | Reg of int
+  | RawByte of char
+
+type add_dest =
+  | Reg of int
+  | Index
 
 let key_opt_of_char (c: char) : char option =
   let value_opt =

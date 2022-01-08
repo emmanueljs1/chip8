@@ -15,15 +15,13 @@ let binary_op_of_hex (code: char): binary_op option =
 type opcode =
   | Noop
   | ClearScreen
-  | SetRegToValue of int * char
-  | AddValueToReg of int * char
-  | SetIndexToValue of int
+  | Set of set_source * set_dest
+  | Add of add_source * add_dest
   | Display of int * int * int
   | EnterSubroutine of int
   | ReturnFromSubroutine
   | SkipIfRegHasValue of int * char * bool
   | SkipIfRegsAreEqual of int * int * bool
-  | SetRegToReg of int * int
   | BinaryOp of int * binary_op * int
   | JumpWithOffset of int * bool
   | Random of int * char
@@ -53,14 +51,14 @@ let decode_instruction (byte1: char) (byte2: char) : instruction =
   | ['6'; x; h1; h2], _ ->
       let reg = int_of_hex x in
       let value = Hex.to_char h1 h2 in
-      { opcode = SetRegToValue (reg, value); duration_ms = 27. }
+      { opcode = Set (RawByte value, Reg reg); duration_ms = 27. }
   | ['7'; x; h1; h2], _ ->
       let reg = int_of_hex x in
       let value = Hex.to_char h1 h2 in
-      { opcode = AddValueToReg (reg, value); duration_ms = 45. }
+      { opcode = Add (RawByte value, Reg reg); duration_ms = 45. }
   | ['A'; h1; h2; h3], _ ->
       let value = int_of_hexes h1 h2 h3 in
-      { opcode = SetIndexToValue value; duration_ms = 55. }
+      { opcode = Set (Lit value, Index); duration_ms = 55. }
   | ['D'; x; y; h], _ ->
       let vx, vy = int_of_hex x, int_of_hex y in
       let n = int_of_hex h in
@@ -81,7 +79,7 @@ let decode_instruction (byte1: char) (byte2: char) : instruction =
       { opcode = SkipIfRegsAreEqual (vx, vy, are_equal); duration_ms = 73. }
   | ['8'; x; y; '0'], _ ->
       let vx, vy = int_of_hex x, int_of_hex y in
-      { opcode = SetRegToReg (vx, vy); duration_ms = 200. }
+      { opcode = Set (Reg vy, Reg vx); duration_ms = 200. }
   | ['8'; x; y; h], _ when binary_op_of_hex h <> None ->
       let binary_op = binary_op_of_hex h |> Option.get in
       let vx, vy = int_of_hex x, int_of_hex y in
@@ -94,6 +92,19 @@ let decode_instruction (byte1: char) (byte2: char) : instruction =
       let vx = int_of_hex x in
       let if_key_pressed = h = '9' in
       { opcode = SkipIfKey (vx, if_key_pressed); duration_ms = 73. }
+  | ['F'; x; '0'; '7'], _ | ['F'; x; '1'; '5'], _ | ['F'; x; '1'; '8'], _ ->
+      let vx = int_of_hex x in
+      let source : set_source = if c3 = '0' then Reg vx else DelayTimer in
+      let dest =
+        match c3, c4 with
+        | '1', '5' -> DelayTimer
+        | '1', '8' -> SoundTimer
+        | _ -> Reg vx
+      in
+      { opcode = Set (source, dest); duration_ms = 45. }
+  | ['F'; x; '1'; 'E'], _ ->
+      let vx = int_of_hex x in
+      { opcode = Set (Reg vx, Index); duration_ms = 86. }
   | _, unsupported ->
       Printf.sprintf "Warning: unsupported instruction %s" unsupported |> print_endline;
       { opcode = Noop; duration_ms = 0. }
