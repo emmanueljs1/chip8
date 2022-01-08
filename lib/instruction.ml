@@ -34,7 +34,8 @@ type opcode =
   | SkipIfRegsNotEqual of int * int
   | SetRegToReg of int * int
   | BinaryOp of int * binary_op * int
-  | SetIndex of int
+  | JumpWithOffset of int
+  | Random of int * char
 
 type instruction =
   { opcode: opcode
@@ -97,6 +98,14 @@ let decode_instruction (byte1: char) (byte2: char) : instruction =
       let binary_op = binary_op_of_hex h |> Option.get in
       let vx, vy = int_of_hex x, int_of_hex y in
       { opcode = BinaryOp (vx, binary_op, vy); duration_ms = 200. }
+  | ['B'; h1; h2; h3], _ ->
+      let addr = int_of_hexes h1 h2 h3 in
+      (* TODO: support alternate behavior *)
+      { opcode = JumpWithOffset addr; duration_ms = 105. }
+  | ['C'; x; h1; h2], _ ->
+      let vx = int_of_hex x in
+      let value = Hex.to_char h1 h2 in
+      { opcode = Random (vx, value); duration_ms = 164. }
   | _, unsupported ->
       Printf.sprintf "Warning: unsupported instruction %s" unsupported |> print_endline;
       { opcode = Noop; duration_ms = 0. }

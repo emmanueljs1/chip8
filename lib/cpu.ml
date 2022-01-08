@@ -157,12 +157,21 @@ module Make (GUI: Gui.GUI) = struct
               Registers.set_register 0xF (char_of_int flag) cpu.registers;
               subtracted mod 255
           | Shift right ->
+              (* TODO: support ambiguous behavior *)
               let shifted = if right then vx lsr 1 else vx lsl 1 in
               let flag = if right then vx land 1 else (vx lsr 7) in
               Registers.set_register 0xF (char_of_int flag) cpu.registers;
               shifted mod 255
         in
         Registers.set_register x (char_of_int vx') cpu.registers;
+        { cpu with pc = pc' }
+    | JumpWithOffset addr ->
+        let offset = Registers.register 0x0 cpu.registers |> int_of_char in
+        { cpu with pc = addr + offset }
+    | Random (x, value) ->
+        let rand = Random.int 256 in
+        let res = (int_of_char value) land rand |> char_of_int in
+        Registers.set_register x res cpu.registers;
         { cpu with pc = pc' }
     | Noop -> { cpu with pc = pc' }
 
