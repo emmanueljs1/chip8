@@ -135,6 +135,36 @@ module Make (GUI: Gui.GUI) = struct
         let vy = Registers.register y cpu.registers in
         Registers.set_register x vy cpu.registers;
         { cpu with pc = pc' }
+    | BinaryOp (x, binary_op, y) ->
+        let vx = Registers.register x cpu.registers |> int_of_char in
+        let vy = Registers.register y cpu.registers |> int_of_char in
+        let vx' =
+          match binary_op with
+          | Or -> vx lor vy
+          | And -> vx land vy
+          | Xor -> vx lxor vy
+          | Add ->
+              let added = vx + vy in
+              let flag = if added > 255 then 1 else 0 in
+              Registers.set_register 0xF (char_of_int flag) cpu.registers;
+              added mod 255
+          | Subtract reversed ->
+              let op1 = if not reversed then vx else vy in
+              let op2 = if not reversed then vy else vx in
+              let ones_complement = op2 lxor 255 in
+              let subtracted = op1 + ones_complement + 1 in
+              let flag = if subtracted > 255 then 1 else 0 in
+              Registers.set_register 0xF (char_of_int flag) cpu.registers;
+              subtracted mod 255
+          | Shift right ->
+              let shifted = if right then vx lsr 1 else vx lsl 1 in
+              let flag = if right then vx land 1 else (vx lsr 7) in
+              Registers.set_register 0xF (char_of_int flag) cpu.registers;
+              shifted mod 255
+        in
+        Registers.set_register x (char_of_int vx') cpu.registers;
+        { cpu with pc = pc' }
+    | Noop -> { cpu with pc = pc' }
 
   let step (cpu: cpu) : cpu * float =
     let (byte1, byte2) =
