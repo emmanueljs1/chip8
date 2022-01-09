@@ -82,7 +82,7 @@ let () =
 
   if debug then Printexc.record_backtrace true;
   let frequency = args_opt int_of_string 600 "frequency" args in
-  let rom_filename = args_opt (fun s -> s) "roms/test.ch8" "rom" args in
+  let rom_filename = args_opt (fun s -> s) "roms/test_opcode.ch8" "rom" args in
 
   let program = load_rom rom_filename in
   let cpu = Cpu.boot ~program:program in
