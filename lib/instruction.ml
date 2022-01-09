@@ -42,14 +42,19 @@ let int_of_hex (hex: char) : int = Hex.to_char '0' hex |> int_of_char
 let int_of_hexes (h1: char) (h2: char) (h3: char) : int =
   let upper = Hex.to_char '0' h1 |> int_of_char |> (fun i -> i lsl 8) in
   let lower = Hex.to_char h2 h3 |> int_of_char in
-  upper + lower
+  (upper + lower) mod 4096
+
+let hex_of_bytes (byte1: char) (byte2: char) : char list * string =
+  let (c1, c2), (c3, c4) = Hex.of_char byte1, Hex.of_char byte2 in
+  let hex_encodings = List.map Char.uppercase_ascii [c1; c2; c3; c4] in
+  let str = String.init 4 (List.nth hex_encodings) in
+  hex_encodings, str
 
 (* ms duration based off https://jackson-s.me/2019/07/13/Chip-8-Instruction-Scheduling-and-Frequency.html
  * note that the average time is used and the variance is ignored *)
 let decode_instruction (byte1: char) (byte2: char) : instruction =
-  let (c1, c2), (c3, c4) = Hex.of_char byte1, Hex.of_char byte2 in
-  let hex_encodings = List.map Char.uppercase_ascii [c1; c2; c3; c4] in
-  match hex_encodings, String.init 4 (List.nth hex_encodings) with
+  let hex = hex_of_bytes byte1 byte2 in
+  match hex with
   | _, "00E0" -> { opcode = ClearScreen; duration_ms = 109. }
   | ['1' as h; h1; h2; h3], _ | ['B' as h; h1; h2; h3], _ ->
       let with_offset = h = 'B' in
@@ -101,11 +106,15 @@ let decode_instruction (byte1: char) (byte2: char) : instruction =
       { opcode = SkipIfKey (vx, if_key_pressed); duration_ms = 73. }
   | ['F'; x; '0'; '7'], _ | ['F'; x; '1'; '5'], _ | ['F'; x; '1'; '8'], _ ->
       let vx = int_of_hex x in
-      let source : set_source = if c3 = '0' then Reg vx else DelayTimer in
+      let source : set_source =
+        match hex with
+        | _ :: _ :: ['0'; '7'], _ -> Reg vx
+        | _ -> DelayTimer
+      in
       let dest =
-        match c3, c4 with
-        | '1', '5' -> DelayTimer
-        | '1', '8' -> SoundTimer
+        match hex with
+        | _ :: _ :: ['1'; '5'], _ -> DelayTimer
+        | _ :: _ :: ['1'; '8'], _ -> SoundTimer
         | _ -> Reg vx
       in
       { opcode = Set (source, dest); duration_ms = 45. }

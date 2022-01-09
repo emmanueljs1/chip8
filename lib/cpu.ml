@@ -58,9 +58,9 @@ module Make (GUI: Gui.GUI) = struct
               Registers.set_register reg value cpu.registers;
               cpu
           | Reg _, DelayTimer->
-              { cpu with delay_timer = source_value mod 255 |> char_of_int }
+              { cpu with delay_timer = source_value mod 256 |> char_of_int }
           | Reg _, SoundTimer->
-              { cpu with sound_timer = source_value mod 255 |> char_of_int }
+              { cpu with sound_timer = source_value mod 256 |> char_of_int }
           | Lit _, Index ->
               { cpu with index = source_value }
           | _ -> failwith "invalid source/dest combination for set instruction"
@@ -80,7 +80,7 @@ module Make (GUI: Gui.GUI) = struct
         let cpu' =
           match source, dest with
           | RawByte _, Reg reg ->
-              let new_value = (current_value + value_to_add) mod 255 in
+              let new_value = (current_value + value_to_add) mod 256 in
               Registers.set_register reg (char_of_int new_value) cpu.registers;
               cpu
           | Reg _, Index ->
@@ -131,7 +131,7 @@ module Make (GUI: Gui.GUI) = struct
         Registers.set_register 0xF (char_of_int flag) cpu.registers;
         { cpu with pc = pc' }
     | EnterSubroutine addr ->
-        { cpu with pc = addr; stack = cpu.pc :: cpu.stack }
+        { cpu with pc = addr; stack = pc' :: cpu.stack }
     | ReturnFromSubroutine ->
         let addr, stack' =
           match cpu.stack with
@@ -172,13 +172,13 @@ module Make (GUI: Gui.GUI) = struct
               let subtracted = op1 + ones_complement + 1 in
               let flag = if subtracted > 255 then 1 else 0 in
               Registers.set_register 0xF (char_of_int flag) cpu.registers;
-              subtracted mod 255
+              subtracted mod 256
           | Shift right ->
               (* TODO: support ambiguous behavior *)
               let shifted = if right then vx lsr 1 else vx lsl 1 in
               let flag = if right then vx land 1 else (vx lsr 7) in
               Registers.set_register 0xF (char_of_int flag) cpu.registers;
-              shifted mod 255
+              shifted mod 256
         in
         Registers.set_register x (char_of_int vx') cpu.registers;
         { cpu with pc = pc' }
@@ -257,11 +257,12 @@ module Make (GUI: Gui.GUI) = struct
         { cpu with pc = pc' }
     | Noop -> { cpu with pc = pc' }
 
+  let fetch_ins_bytes (cpu: cpu) : char * char =
+    Bus.fetch_ram cpu.pc cpu.bus,
+    Bus.fetch_ram (cpu.pc + 1) cpu.bus
+
   let step (cpu: cpu) : cpu * float =
-    let (byte1, byte2) =
-      Bus.fetch_ram cpu.pc cpu.bus,
-      Bus.fetch_ram (cpu.pc + 1) cpu.bus
-    in
+    let (byte1, byte2) = fetch_ins_bytes cpu in
     let instruction = decode_instruction byte1 byte2 in
     let cpu' = execute_instruction cpu instruction in
     cpu', instruction.duration_ms
@@ -406,7 +407,32 @@ module Make (GUI: Gui.GUI) = struct
       ) booted_at
     in
 
-    (* TODO: user input poll thread (debug + external) *)
+    let _ =
+      Thread.create (fun _ ->
+        let rec loop () =
+          match GUI.read_key !cpu.gui with
+          | 'p' ->
+              Mutex.lock cpu_mutex;
+              cpu := { !cpu with state = Paused };
+              let (byte1, byte2) = fetch_ins_bytes !cpu in
+              let _, ins = hex_of_bytes byte1 byte2 in
+              Printf.sprintf "Instruction: %s" ins |> print_endline;
+              Mutex.unlock cpu_mutex;
+              loop ()
+          | c when int_of_char c = 13 ->
+              Mutex.lock cpu_mutex;
+              if !cpu.state = Paused then cpu := { !cpu with state = Running };
+              Mutex.unlock cpu_mutex;
+              loop ()
+          | c when int_of_char c = 27 ->
+              Mutex.lock cpu_mutex;
+              cpu := { !cpu with state = Off };
+              Mutex.unlock cpu_mutex
+          | _ -> loop ()
+        in
+        loop ()
+      ) ()
+    in
 
     Thread.join clock_thread;
     Thread.join timer_thread
