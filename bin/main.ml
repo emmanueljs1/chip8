@@ -44,6 +44,8 @@ module GraphicsGui = struct
   let is_key_pressed = Graphics.key_pressed
 
   let read_key = Graphics.read_key
+
+  let play_sound _ = Graphics.sound 1 1 (* xquarts only uses system beep *)
 end
 
 let args_opt (f: string -> 'a) (fallback: 'a) (opt: string) (args: string array) : 'a =

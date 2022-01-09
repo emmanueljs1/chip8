@@ -15,5 +15,5 @@ module type GUI = sig
 
   val set_pixel : int -> int -> bool -> screen -> unit
 
-  (* TODO: debug / external methods *)
+  val play_sound : gui -> unit
 end

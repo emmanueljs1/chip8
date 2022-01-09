@@ -446,6 +446,20 @@ module Make (GUI: Gui.GUI) = struct
     let _ =
       Thread.create (fun _ ->
         let rec loop () =
+          match !cpu.state with
+          | Running when int_of_char !cpu.sound_timer > 0 ->
+              GUI.play_sound !cpu.gui;
+              Thread.delay 1.;
+          | Off -> Thread.exit ()
+          | _ -> loop ()
+          in
+        loop ()
+      ) ()
+    in
+
+    let _ =
+      Thread.create (fun _ ->
+        let rec loop () =
           match GUI.read_key !cpu.gui with
           | c when int_of_char c = 32 && debug ->
               Mutex.lock cpu_mutex;
