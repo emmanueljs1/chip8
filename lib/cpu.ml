@@ -63,7 +63,11 @@ module Make (GUI: Gui.GUI) = struct
               { cpu with sound_timer = source_value mod 256 |> char_of_int }
           | Lit _, Index ->
               { cpu with index = source_value }
-          | _ -> failwith "invalid source/dest combination for set instruction"
+          | _ ->
+              let source_pp = print_set_source source in
+              let dest_pp = print_set_dest dest in
+              Printf.sprintf "%s -> %s not a valid set ins" source_pp dest_pp
+              |> failwith
         in
         { cpu' with pc = pc' }
     | Add (source, dest) ->

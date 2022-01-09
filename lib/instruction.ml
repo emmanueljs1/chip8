@@ -120,7 +120,7 @@ let decode_instruction (byte1: char) (byte2: char) : instruction =
       { opcode = Set (source, dest); duration_ms = 45. }
   | ['F'; x; '1'; 'E'], _ ->
       let vx = int_of_hex x in
-      { opcode = Set (Reg vx, Index); duration_ms = 86. }
+      { opcode = Add (Reg vx, Index); duration_ms = 86. }
   | ['F'; x; '0'; 'A'], _ ->
       let vx = int_of_hex x in
       { opcode = GetKey vx; duration_ms = 0. }
