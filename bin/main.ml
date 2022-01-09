@@ -81,9 +81,10 @@ let () =
   let debug = Array.exists (fun s -> s = "--debug") args in
 
   if debug then Printexc.record_backtrace true;
+  let breakpoints = args_opt (String.split_on_char ',') [] "breakpoints" args in
   let frequency = args_opt int_of_string 600 "frequency" args in
   let rom_filename = args_opt (fun s -> s) "roms/test_opcode.ch8" "rom" args in
 
   let program = load_rom rom_filename in
   let cpu = Cpu.boot ~program:program in
-  Cpu.run ~debug:debug ~frequency:frequency cpu
+  Cpu.run ~breakpoints:breakpoints ~debug:debug ~frequency:frequency cpu

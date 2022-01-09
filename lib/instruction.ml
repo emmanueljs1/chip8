@@ -137,3 +137,13 @@ let decode_instruction (byte1: char) (byte2: char) : instruction =
   | _, unsupported ->
       Printf.sprintf "Warning: unsupported instruction %s" unsupported |> print_endline;
       { opcode = Noop; duration_ms = 0. }
+
+let instructions_match (src: string) (tgt: string) : bool =
+  let explode s = List.init (String.length s) (String.get s) in
+  match explode tgt with
+  | ['F'; _; '5'; '5'] ->
+      begin match explode src with
+      | ['F'; _; '5'; '5'] -> true
+      | _ -> false
+      end
+  | _ -> false

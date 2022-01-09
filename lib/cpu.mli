@@ -3,5 +3,5 @@ module Make (GUI: Gui.GUI) : sig
 
   val boot : program:char array -> cpu
 
-  val run : debug:bool -> frequency:int -> cpu -> unit
+  val run : ?breakpoints:string list -> ?debug:bool -> frequency:int -> cpu -> unit
 end

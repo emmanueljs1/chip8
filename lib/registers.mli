@@ -6,4 +6,6 @@ module R : sig
   val set_register : int -> char -> registers -> unit
 
   val register : int -> registers -> char
+
+  val print : registers -> unit
 end

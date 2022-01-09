@@ -237,7 +237,7 @@ module Make (GUI: Gui.GUI) = struct
           if i > x then
             ()
           else (
-            let vx = Registers.register (x + i) cpu.registers in
+            let vx = Registers.register i cpu.registers in
             Bus.write_ram (cpu.index + i) vx cpu.bus;
             loop (i + 1)
           )
@@ -250,7 +250,7 @@ module Make (GUI: Gui.GUI) = struct
             ()
           else
             let byte = Bus.fetch_ram (cpu.index + i) cpu.bus in
-            Registers.set_register (x + i) byte cpu.registers;
+            Registers.set_register i byte cpu.registers;
             loop (i + 1)
         in
         loop 0;
@@ -261,13 +261,28 @@ module Make (GUI: Gui.GUI) = struct
     Bus.fetch_ram cpu.pc cpu.bus,
     Bus.fetch_ram (cpu.pc + 1) cpu.bus
 
+  let print (cpu: cpu) : unit  =
+    let (byte1, byte2) = fetch_ins_bytes cpu in
+    let _, ins = hex_of_bytes byte1 byte2 in
+    Printf.sprintf "Instruction: %s" ins |> print_endline;
+    Registers.print cpu.registers;
+    Printf.sprintf "Index %i" cpu.index |> print_endline;
+    let index_mem = Bus.fetch_ram cpu.index cpu.bus in
+    int_of_char index_mem
+    |> Printf.sprintf "Mem at index: %i"
+    |> print_endline
+
+  let pause_cpu (cpu: cpu) : cpu =
+    print cpu;
+    { cpu with state = Paused }
+
   let step (cpu: cpu) : cpu * float =
     let (byte1, byte2) = fetch_ins_bytes cpu in
     let instruction = decode_instruction byte1 byte2 in
     let cpu' = execute_instruction cpu instruction in
     cpu', instruction.duration_ms
 
-  let run ~debug ~frequency cpu =
+  let run ?(breakpoints = []) ?(debug = false) ~frequency cpu =
     let cycle_time = 1. /. (float_of_int frequency) in
     let timer_update_time = 1. /. 60. in
 
@@ -349,7 +364,24 @@ module Make (GUI: Gui.GUI) = struct
                 in
 
                 let rec loop n time_elapsed_in_cycle =
-                  if n > 0 then (
+                  let did_pause =
+                    if debug then (
+                      Mutex.lock cpu_mutex;
+                      let (byte1, byte2) = fetch_ins_bytes !cpu in
+                      let _, ins = hex_of_bytes byte1 byte2 in
+                      let will_pause =
+                        List.find_opt (instructions_match ins) breakpoints <> None
+                      in
+                      if will_pause then cpu := pause_cpu !cpu;
+                      Mutex.unlock cpu_mutex;
+                      will_pause
+                    ) else
+                      false
+                  in
+
+                  if did_pause then
+                    0
+                  else if n > 0 then (
                     Mutex.lock cpu_mutex;
                     let (cpu', duration_ms) = step !cpu in
                     cpu := cpu';
@@ -411,17 +443,24 @@ module Make (GUI: Gui.GUI) = struct
       Thread.create (fun _ ->
         let rec loop () =
           match GUI.read_key !cpu.gui with
-          | 'p' ->
+          | c when int_of_char c = 32 && debug ->
               Mutex.lock cpu_mutex;
-              cpu := { !cpu with state = Paused };
-              let (byte1, byte2) = fetch_ins_bytes !cpu in
-              let _, ins = hex_of_bytes byte1 byte2 in
-              Printf.sprintf "Instruction: %s" ins |> print_endline;
+              begin match !cpu.state with
+              | Running -> cpu := pause_cpu !cpu
+              | Paused -> cpu := { !cpu with state = Running }
+              | _ -> ()
+              end;
               Mutex.unlock cpu_mutex;
               loop ()
-          | c when int_of_char c = 13 ->
+          | c when int_of_char c = 13 && debug ->
               Mutex.lock cpu_mutex;
-              if !cpu.state = Paused then cpu := { !cpu with state = Running };
+              begin match !cpu.state with
+              | Paused ->
+                  let (cpu', _) = step !cpu in
+                  cpu := cpu';
+                  print !cpu
+              | _ -> ()
+              end;
               Mutex.unlock cpu_mutex;
               loop ()
           | c when int_of_char c = 27 ->
