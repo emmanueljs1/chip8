@@ -108,8 +108,8 @@ let decode_instruction (byte1: char) (byte2: char) : instruction =
       let vx = int_of_hex x in
       let source : set_source =
         match hex with
-        | _ :: _ :: ['0'; '7'], _ -> Reg vx
-        | _ -> DelayTimer
+        | _ :: _ :: ['0'; '7'], _ -> DelayTimer
+        | _ -> Reg vx
       in
       let dest =
         match hex with
