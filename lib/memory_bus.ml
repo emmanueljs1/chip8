@@ -19,7 +19,6 @@ let fonts =
   ] |> Array.map char_of_int
 
 let font_start_addr = 0x050
-let font_end_addr = 0x090
 
 let screen_width = 64
 let screen_height = 32
