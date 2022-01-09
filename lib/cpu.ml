@@ -164,7 +164,7 @@ module Make (GUI: Gui.GUI) = struct
               let added = vx + vy in
               let flag = if added > 255 then 1 else 0 in
               Registers.set_register 0xF (char_of_int flag) cpu.registers;
-              added mod 255
+              added mod 256
           | Subtract reversed ->
               let op1 = if not reversed then vx else vy in
               let op2 = if not reversed then vy else vx in
